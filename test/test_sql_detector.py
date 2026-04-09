@@ -14,19 +14,15 @@ class TestSqlDetector(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """初始化测试环境"""
+        from agent.config import load_config
+        
         cls.db_path = str(Path(__file__).parent.parent / "database" / "ecommerce.db")
-
-        cls.agent = SqlDetectorAgent(
-            config=AgentConfig(
-                name="sql_detector_test",
-                model=ModelConfig(
-                    model_type="openai",
-                    model_name="gpt-4",
-                    api_key="test-key",
-                ),
-                database={"db_path": cls.db_path},
-            )
-        )
+        
+        config = load_config(str(Path(__file__).parent.parent / "agent" / "config.json"))
+        config.name = "sql_detector_test"
+        config.database.db_path = cls.db_path
+        
+        cls.agent = SqlDetectorAgent(config=config)
 
     def test_01_get_schema(self):
         """测试：获取数据库结构"""

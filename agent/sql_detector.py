@@ -1,11 +1,13 @@
 import sys
 from pathlib import Path
 from typing import Literal
+import asyncio
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import agentscope
 from agentscope.agent import ReActAgent
+from agentscope.message import Msg
 from agentscope.model import OpenAIChatModel, DashScopeChatModel, AnthropicChatModel, OllamaChatModel
 from agentscope.tool import Toolkit
 from agentscope.formatter import (
@@ -35,7 +37,7 @@ class SqlDetectorAgent:
             return OpenAIChatModel(
                 model_name=model_config.model_name,
                 api_key=model_config.api_key,
-                base_url=model_config.model_url,
+                client_kwargs={"base_url": model_config.model_url} if model_config.model_url else None,
             )
         elif model_config.model_type == "anthropic":
             return AnthropicChatModel(
@@ -46,11 +48,12 @@ class SqlDetectorAgent:
             return DashScopeChatModel(
                 model_name=model_config.model_name,
                 api_key=model_config.api_key,
+                base_http_api_url=model_config.model_url,
             )
         elif model_config.model_type == "ollama":
             return OllamaChatModel(
                 model_name=model_config.model_name,
-                base_url=model_config.model_url,
+                host=model_config.model_url,
             )
         else:
             raise ValueError(f"Unknown model type: {model_config.model_type}")
@@ -86,11 +89,7 @@ class SqlDetectorAgent:
         if skill_config.enabled and skill_config.skill_dir:
             skill_dir = Path(skill_config.skill_dir)
             if skill_dir.exists():
-                toolkit.register_agent_skill(
-                    skill_dir=str(skill_dir),
-                    name=skill_dir.name,
-                    description=f"Skill directory: {skill_dir.name}",
-                )
+                toolkit.register_agent_skill(skill_dir=str(skill_dir))
 
         return toolkit
 
@@ -119,8 +118,12 @@ class SqlDetectorAgent:
         """Run the agent to analyze a SQL query for performance issues."""
         agentscope.init(project="sql-detector")
         
-        response = self.agent(query)
-        return response
+        async def _run():
+            msg = Msg(name="user", content=query, role="user")
+            response = await self.agent.reply(msg)
+            return str(response)
+        
+        return asyncio.run(_run())
 
 
 def create_agent(config_path: str | None = None, **kwargs) -> SqlDetectorAgent:
